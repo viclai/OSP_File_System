@@ -99,14 +99,14 @@ static struct super_operations ospfs_superblock_ops;
  *   in a bitmap, may be useful.
  */
 
-// bitvector_set -- Set 'i'th bit of 'vector' to 1.
+// bitvector_set -- Set 'i'th bit of 'vector' to 1. (1 -free)
 static inline void
 bitvector_set(void *vector, int i)
 {
 	((uint32_t *) vector) [i / 32] |= (1 << (i % 32));
 }
 
-// bitvector_clear -- Set 'i'th bit of 'vector' to 0.
+// bitvector_clear -- Set 'i'th bit of 'vector' to 0. (0 -in use)
 static inline void
 bitvector_clear(void *vector, int i)
 {
@@ -452,8 +452,11 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * the loop.  For now we do this all the time.
 		 *
 		 * EXERCISE: Your code here */
-		r = 1;		/* Fix me! */
-		break;		/* Fix me! */
+		if (f_pos > dir_oi->oi_size * OSPFS_DIRENTRY_SIZE)
+		{
+			r = 1;		/* Fix me! */
+			break;		/* Fix me! */
+		}
 
 		/* Get a pointer to the next entry (od) in the directory.
 		 * The file system interprets the contents of a
@@ -474,8 +477,41 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * your function should advance f_pos by the proper amount to
 		 * advance to the next directory entry.
 		 */
-
 		/* EXERCISE: Your code here */
+
+
+		//Get pointer to next entry and pointer to that entry's inode
+		od = ospfd_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
+		entry_oi = ospfs_inode(od->od_ino);
+
+		//Ignore blank directory entries or else call filldir on each dir entry.
+		uint32_t filetype = entry_oi->oi_ftype;
+		if (od->od_ino == 0)
+			f_pos++;
+		else if (filetype == OSPFS_FTYPE_REG)
+		{
+			ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_REG);
+			if (ok_so_far >= 0)
+				f_pos++;
+		}
+		else if (filetype == OSPFS_FTYPE_DIR)
+		{
+			ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_DIR);
+			if (ok_so_far >= 0)
+				f_pos++;
+		}
+		else if (filetype == OSPFS_FTYPE_SYMLINK)
+		{
+			ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_LNK);
+			if (ok_so_far >= 0)
+				f_pos++;
+		}
+		else //Error?
+		{
+			;
+		}
+		
+
 	}
 
 	// Save the file position and return!
@@ -553,6 +589,18 @@ static uint32_t
 allocate_block(void)
 {
 	/* EXERCISE: Your code here */
+
+	ospfs_inode_t *bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+
+	int i;
+	for (i = 0; i < ospfs_super->os_nblocks; i++)
+	{
+		if (bitvector_test(bitmap, i) == 1)
+		{
+			bitvector_clear(bitmap, i);
+			return i;
+		}
+	}
 	return 0;
 }
 
@@ -572,6 +620,8 @@ static void
 free_block(uint32_t blockno)
 {
 	/* EXERCISE: Your code here */
+	ospfs_inode_t *bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+	bitvector_set(bitmap, blockno);
 }
 
 
@@ -840,11 +890,15 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 {
 	ospfs_inode_t *oi = ospfs_inode(filp->f_dentry->d_inode->i_ino);
 	int retval = 0;
-	size_t amount = 0;
+	size_t amount = 0; //Count of chars read
 
 	// Make sure we don't read past the end of the file!
 	// Change 'count' so we never read past the end of the file.
 	/* EXERCISE: Your code here */
+	//If there isn't count bytes left to read, update count
+	//to the remaining number of bytes that can be read.
+	if (*f_pos + count > oi->oi_size)
+		count = oi->oi_size - *f_pos;
 
 	// Copy the data to user block by block
 	while (amount < count && retval >= 0) {
@@ -865,8 +919,19 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		// into user space.
 		// Use variable 'n' to track number of bytes moved.
 		/* EXERCISE: Your code here */
-		retval = -EIO; // Replace these lines
-		goto done;
+
+		//Determine data left to be read in this block.
+		if (count - amount + (*f_pos % OSPFS_BLKSIZE) > OSPFS_BLKSIZE)
+			n = OSPFS_BLKSIZE - (*f_pos % OSPFS_BLKSIZE);
+		else // Reached last block
+			n = count - amount;
+
+		retval = copy_to_user(buffer, data, n);
+		if (retval < 0)
+		{
+			retval = -EFAULT; // Replace these lines
+			goto done;
+		}
 
 		buffer += n;
 		amount += n;
@@ -909,6 +974,8 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	// If the user is writing past the end of the file, change the file's
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
+	//if (*f_pos + count > oi->oi_size)
+
 
 	// Copy data block by block
 	while (amount < count && retval >= 0) {
@@ -928,8 +995,11 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		// read user space.
 		// Keep track of the number of bytes moved in 'n'.
 		/* EXERCISE: Your code here */
+
+		//retval = copy_from_user(data, buffer, n);
 		retval = -EIO; // Replace these lines
 		goto done;
+
 
 		buffer += n;
 		amount += n;
@@ -1231,3 +1301,4 @@ module_exit(exit_ospfs_fs)
 MODULE_AUTHOR("Skeletor");
 MODULE_DESCRIPTION("OSPFS");
 MODULE_LICENSE("GPL");
+
