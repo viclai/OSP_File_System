@@ -11,14 +11,14 @@
 # information you'd like us to know, please add it at the end of the file.
 
 # Partner 1
-Name: 
-Student ID: 
-Email: 
+Name: Victor Lai 
+Student ID: 404-274-720 
+Email: victorlai@ucla.edu 
 
 # Partner 2 (if you're working in a team)
-Name: 
-Student ID: 
-Email: 
+Name: Gloria Chan 
+Student ID: 604-284-011
+Email: qloria@ucla.edu 
 
 # Extra credit problems
 #Extra credit problem: none
