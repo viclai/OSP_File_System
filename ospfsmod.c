@@ -432,13 +432,15 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	// f_pos is an offset into the directory's data, plus two.
 	// The "plus two" is to account for "." and "..".
 	if (r == 0 && f_pos == 0) {
-		ok_so_far = filldir(dirent, ".", 1, f_pos, dir_inode->i_ino, DT_DIR);
+		ok_so_far = filldir(dirent, ".", 1, 
+			f_pos, dir_inode->i_ino, DT_DIR);
 		if (ok_so_far >= 0)
 			f_pos++;
 	}
 
 	if (r == 0 && ok_so_far >= 0 && f_pos == 1) {
-		ok_so_far = filldir(dirent, "..", 2, f_pos, filp->f_dentry->d_parent->d_inode->i_ino, DT_DIR);
+		ok_so_far = filldir(dirent, "..", 2, f_pos, 
+			filp->f_dentry->d_parent->d_inode->i_ino, DT_DIR);
 		if (ok_so_far >= 0)
 			f_pos++;
 	}
@@ -479,39 +481,34 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 */
 		/* EXERCISE: Your code here */
 
-
-		//Get pointer to next entry and pointer to that entry's inode
-		od = ospfd_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
+		// Get pointer to next entry and pointer to that entry's inode
+		od = ospfs_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
 		entry_oi = ospfs_inode(od->od_ino);
 
-		//Ignore blank directory entries or else call filldir on each dir entry.
+		// Call filldir on each dir entry.
 		uint32_t filetype = entry_oi->oi_ftype;
-		if (od->od_ino == 0)
+		if (od->od_ino == 0) // Ignore blank directory entries
 			f_pos++;
-		else if (filetype == OSPFS_FTYPE_REG)
-		{
-			ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_REG);
+		else if (filetype == OSPFS_FTYPE_REG) {
+			ok_so_far = filldir(dirent, od->od_name, 
+				strlen(od->od_name), f_pos, od->od_ino, 
+				DT_REG);
 			if (ok_so_far >= 0)
 				f_pos++;
-		}
-		else if (filetype == OSPFS_FTYPE_DIR)
-		{
-			ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_DIR);
+		} else if (filetype == OSPFS_FTYPE_DIR) {
+			ok_so_far = filldir(dirent, od->od_name, 
+				strlen(od->od_name), f_pos, od->od_ino, 
+				DT_DIR);
 			if (ok_so_far >= 0)
 				f_pos++;
-		}
-		else if (filetype == OSPFS_FTYPE_SYMLINK)
-		{
-			ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, DT_LNK);
+		} else if (filetype == OSPFS_FTYPE_SYMLINK) {
+			ok_so_far = filldir(dirent, od->od_name, 
+				strlen(od->od_name), f_pos, od->od_ino, 
+				DT_LNK);
 			if (ok_so_far >= 0)
 				f_pos++;
-		}
-		else //Error?
-		{
-			;
-		}
-		
-
+		} else
+			r = -EIO;
 	}
 
 	// Save the file position and return!
@@ -544,9 +541,9 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 	for (entry_off = 0; entry_off < dir_oi->oi_size;
 	     entry_off += OSPFS_DIRENTRY_SIZE) {
 		od = ospfs_inode_data(dir_oi, entry_off);
-		if (od->od_ino > 0
-		    && strlen(od->od_name) == dentry->d_name.len
-		    && memcmp(od->od_name, dentry->d_name.name, dentry->d_name.len) == 0)
+		if (od->od_ino > 0 && strlen(od->od_name) == dentry->d_name.len
+			&& memcmp(od->od_name, dentry->d_name.name, 
+			dentry->d_name.len) == 0)
 			break;
 	}
 
@@ -589,10 +586,10 @@ static uint32_t
 allocate_block(void)
 {
 	/* EXERCISE: Your code here */
-
-	ospfs_inode_t *bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+	uint8_t* bitmap = (uint8_t*) ospfs_block(OSPFS_FREEMAP_BLK);
 
 	int i;
+	// FIXME: Set i to the first data block to make it faster. 
 	for (i = 0; i < ospfs_super->os_nblocks; i++)
 	{
 		if (bitvector_test(bitmap, i) == 1)
@@ -620,7 +617,7 @@ static void
 free_block(uint32_t blockno)
 {
 	/* EXERCISE: Your code here */
-	ospfs_inode_t *bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+	uint8_t* bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
 	bitvector_set(bitmap, blockno);
 }
 
@@ -890,13 +887,13 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 {
 	ospfs_inode_t *oi = ospfs_inode(filp->f_dentry->d_inode->i_ino);
 	int retval = 0;
-	size_t amount = 0; //Count of chars read
+	size_t amount = 0; // Count of chars read
 
 	// Make sure we don't read past the end of the file!
 	// Change 'count' so we never read past the end of the file.
 	/* EXERCISE: Your code here */
-	//If there isn't count bytes left to read, update count
-	//to the remaining number of bytes that can be read.
+	// If there isn't count bytes left to read, update count to the 
+	// remaining number of bytes that can be read. 
 	if (*f_pos + count > oi->oi_size)
 		count = oi->oi_size - *f_pos;
 
@@ -905,6 +902,8 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		uint32_t blockno = ospfs_inode_blockno(oi, *f_pos);
 		uint32_t n;
 		char *data;
+		uint32_t notRead; // Number of bytes not read - copy_to_user
+				  // returns this.
 
 		// ospfs_inode_blockno returns 0 on error
 		if (blockno == 0) {
@@ -920,16 +919,15 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		// Use variable 'n' to track number of bytes moved.
 		/* EXERCISE: Your code here */
 
-		//Determine data left to be read in this block.
+		// Determine data left to be read in this block.
 		if (count - amount + (*f_pos % OSPFS_BLKSIZE) > OSPFS_BLKSIZE)
 			n = OSPFS_BLKSIZE - (*f_pos % OSPFS_BLKSIZE);
 		else // Reached last block
 			n = count - amount;
 
-		retval = copy_to_user(buffer, data, n);
-		if (retval < 0)
-		{
-			retval = -EFAULT; // Replace these lines
+		notRead = copy_to_user(buffer, data, n);
+		if (notRead != 0) {
+			retval = -EFAULT;
 			goto done;
 		}
 
@@ -1298,7 +1296,7 @@ module_init(init_ospfs_fs)
 module_exit(exit_ospfs_fs)
 
 // Information about the module
-MODULE_AUTHOR("Skeletor");
+MODULE_AUTHOR("Gloria Chan & Victor Lai");
 MODULE_DESCRIPTION("OSPFS");
 MODULE_LICENSE("GPL");
 
