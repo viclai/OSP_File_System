@@ -951,31 +951,6 @@ remove_block(ospfs_inode_t *oi)
 		indirBlockNo = ospfs_indirect2Block[indirIndex];
 		ospfs_indirectBlock = (uint32_t*) ospfs_block(indirBlockNo);
 		removeMe = ospfs_indirectBlock[blockNo];
-<<<<<<< HEAD
-		
-		free_block(removeMe);
-		ospfs_indirectBlock[blockNo] = 0;
-		if (removeMe == 0) { 
-			/* Check if the removed block is the first in the 
-			 * indirect block. */
-			free_block(indirBlockNo);
-			ospfs_indirect2Block[indirIndex] = 0;
-			
-			if (indirBlockNo == 0) {
-				/* Check if the removed indirect block is the 
-				 * first in the doubly-indirect block. */
-				free_block(oi->oi_indirect2);
-				oi->oi_indirect2 = 0;
-			}
-		}
-
-	} else if (n >= OSPFS_NDIRECT) { // Removing a block in indirect block
-		ospfs_indirectBlock = (uint32_t*) ospfs_block(oi->oi_indirect);
-		blockNo = n - OSPFS_NDIRECT;
-		removeMe = ospfs_indirectBlock[blockNo];
-		
-		free_block(removeMe);
-=======
 		
 		free_block(removeMe);
 		ospfs_indirectBlock[blockNo] = 0;
