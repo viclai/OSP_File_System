@@ -91,6 +91,39 @@ close FOO;
       '15'
     ],
 
+    # Directory reading tests: 
+
+    # ls of root directory 
+    [ 'cd test/ && ls -m / && cd ..',
+      "bin, boot, cow, dev, etc, home, initrd, initrd.img, lib, live_media, media, mnt, opt, proc, root, sbin, srv, sys, tmp, usr, var, vmlinuz"
+    ],
+
+    # ls of root directory including file types
+    [ 'cd test/ && ls -mF / && cd ..',
+      "bin/, boot/, cow/, dev/, etc/, home/, initrd/, initrd.img@, lib/, live_media/, media/, mnt/, opt/, proc/, root/, sbin/, srv/, sys/, tmp/, usr/, var/, vmlinuz@"
+    ],
+
+    # ls of subdirectory 
+    [ 'ls test/subdir',
+      "message.txt"
+    ],
+
+    # Reading tests: 
+
+    # Read the first byte of a file 
+    [ 'dd count=1 bs=1 if=test/hello.txt 2>/dev/null',
+      "H"
+    ],
+
+    # Read the first block of a file 
+    [ 'dd bs=1024 count=10 if=/dev/zero 2>/dev/null | tr "\0" "V" > test/vFile.txt 2>/dev/null && '.
+      'dd ibs=1024 count=1 if=test/vFile.txt 2>/dev/null | hexdump && ' .
+      'rm test/vFile.txt',
+      "0000000 5656 5656 5656 5656 5656 5656 5656 5656 " .
+      "* " .
+      "0000400"
+    ],
+
 );
 
 my($ntest) = 0;

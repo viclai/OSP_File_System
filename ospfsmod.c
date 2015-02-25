@@ -481,7 +481,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * the loop.  For now we do this all the time.
 		 *
 		 * EXERCISE: Your code here */
-		if (f_pos > (dir_oi->oi_size * OSPFS_DIRENTRY_SIZE)) {
+		if (f_pos >= (dir_oi->oi_size * OSPFS_DIRENTRY_SIZE) + 2) {
 			r = 1;
 			break;
 		}
@@ -508,7 +508,8 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		/* EXERCISE: Your code here */
 
 		// Get pointer to next entry and pointer to that entry's inode
-		od = ospfs_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
+		od = ospfs_inode_data(dir_oi, (f_pos - 2) * 
+			OSPFS_DIRENTRY_SIZE);
 		if (od->od_ino == 0) {
 			r = 1;
 			break;
@@ -785,7 +786,7 @@ add_block(ospfs_inode_t *oi)
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
 
 	// keep track of allocations to free in case of -ENOSPC
-	uint32_t *allocated[2] = { 0, 0 };
+	//uint32_t *allocated[2] = { 0, 0 };
 
 	/* EXERCISE: Your code here */
 	uint8_t* iBlock;
@@ -1057,7 +1058,6 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 			return result;
 		} else
 			continue;
-
 	}
 
 	/* EXERCISE: Make sure you update necessary file meta data
@@ -1221,7 +1221,6 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count,
 	// If the user is writing past the end of the file, change the file's
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
-
 	while (*f_pos + count > oi->oi_size) {
 		if (change_size(oi, *f_pos + count) < 0) {
 			return (ssize_t) ERR_PTR(retval);
@@ -1262,7 +1261,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count,
 			retval = -EFAULT;
 			goto done;
 		}
-
+		
 		buffer += n;
 		amount += n;
 		*f_pos += n;
@@ -1369,7 +1368,7 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 //
 //   Inputs: src_dentry   -- a pointer to the dentry for the source file.  This
 //                           file's inode contains the real data for the hard
-//                           linked filae.  The important elements are:
+//                           linked file.  The important elements are:
 //                             src_dentry->d_name.name
 //                             src_dentry->d_name.len
 //                             src_dentry->d_inode->i_ino
