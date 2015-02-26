@@ -657,7 +657,9 @@ free_block(uint32_t blockno)
 	/* EXERCISE: Your code here */
 	uint8_t* bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
 	// FIXME: Check that the blockno isn't bogus here.
-	bitvector_set(bitmap, blockno);
+	if (blockno != 0 && blockno >= ospfs_super->os_firstinob + OSPFS_BLKINODES
+		&& blockno < ospfs_super->os_nblocks)
+		bitvector_set(bitmap, blockno);
 }
 
 
@@ -799,11 +801,12 @@ add_block(ospfs_inode_t *oi)
 
 	if (n <= OSPFS_NDIRECT) {
 		directBlock = allocate_block();
-		if (directBlock == 0)
+		if (directBlock == 0) {
 			return -ENOSPC;
+		}
 		/* Zero out newly allocated block. */
-                iBlock = (uint8_t*) ospfs_block(directBlock);
-                memset(iBlock, 0, OSPFS_BLKSIZE);
+		iBlock = (uint8_t*) ospfs_block(directBlock);
+		memset(iBlock, 0, OSPFS_BLKSIZE);
 		
 		if (n == OSPFS_NDIRECT) {
 			indirectBlock = allocate_block();
@@ -827,14 +830,14 @@ add_block(ospfs_inode_t *oi)
 		if (directBlock == 0)
 			return -ENOSPC;
 		/* Zero out newly allocated block. */
-                iBlock = (uint8_t*) ospfs_block(directBlock);
-                memset(iBlock, 0, OSPFS_BLKSIZE);
+		iBlock = (uint8_t*) ospfs_block(directBlock);
+		memset(iBlock, 0, OSPFS_BLKSIZE);
 
 		/* Check to see if a doubly-indirect block is needed. */
 		if (n == OSPFS_NDIRECT + OSPFS_NINDIRECT) {
 			/* Create doubly-indirect block. */
 			indirectBlock = allocate_block();
-                	if (indirectBlock == 0) {
+			if (indirectBlock == 0) {
                         	free_block(directBlock);
 	                        return -ENOSPC;
         	        }
@@ -860,18 +863,18 @@ add_block(ospfs_inode_t *oi)
 				ospfs_block(indirectBlock);
 			ospfs_indirect1Block[0] = directBlock;
 		} else { // b < OSPFS_NDIRECT + OSPFS_NINDIRECT
-                        ospfs_indirectBlock = (uint32_t*)
-                                ospfs_block(oi->oi_indirect);
-                        ospfs_indirectBlock[direct_index(n)] = directBlock;
-                }
+			ospfs_indirectBlock = (uint32_t*)
+				ospfs_block(oi->oi_indirect);
+			ospfs_indirectBlock[direct_index(n)] = directBlock;
+		}
 		
 	} else if (n < OSPFS_MAXFILEBLKS) {
 		directBlock = allocate_block();
-                if (directBlock == 0)
-                        return -ENOSPC;
+		if (directBlock == 0)
+			return -ENOSPC;
                 /* Zero out newly allocated block. */
-                iBlock = (uint8_t*) ospfs_block(directBlock);
-                memset(iBlock, 0, OSPFS_BLKSIZE);
+		iBlock = (uint8_t*) ospfs_block(directBlock);
+		memset(iBlock, 0, OSPFS_BLKSIZE);
 
 		if (indir_index(n) > 0 && direct_index(n) == 0) {
 			// The indirect block in the doubly-indirect block is
@@ -1044,9 +1047,9 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 			while (ospfs_size2nblocks(oi->oi_size) > 
 				ospfs_size2nblocks(old_size))
 				remove_block(oi);
-			return r;
-		} else
-			continue;
+			return result;
+		} //else
+//			continue;
 	}
 	// Shrinking file size
 	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
@@ -1054,10 +1057,11 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 		result = remove_block(oi);
 		if (result == -EIO)
 			return result;
-		else if (result == -ENOSPC) {
-			return result;
-		} else
-			continue;
+//		else if (result == -ENOSPC) {
+//			new_size = old_size;
+//			r = result;
+//		} else
+//			continue;
 	}
 
 	/* EXERCISE: Make sure you update necessary file meta data
@@ -1210,22 +1214,37 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count,
 	ospfs_inode_t *oi = ospfs_inode(filp->f_dentry->d_inode->i_ino);
 	int retval = 0;
 	size_t amount = 0;
+	size_t leftInFile;
+	int append = 0;
 
 	// Support files opened with the O_APPEND flag.  To detect O_APPEND,
 	// use struct file's f_flags field and the O_APPEND bit.
 	/* EXERCISE: Your code here */
 	if (filp->f_flags & O_APPEND) {
+		append = 1;
 		*f_pos = oi->oi_size;
+		leftInFile = 0;
 	}
 
 	// If the user is writing past the end of the file, change the file's
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
 	while (*f_pos + count > oi->oi_size) {
-		if (change_size(oi, *f_pos + count) < 0) {
+		retval = change_size(oi, *f_pos + count);
+		if (retval < 0) {
 			return (ssize_t) ERR_PTR(retval);
 		}
 	}
+
+//	leftInFile = oi->oi_size - *f_pos;
+//	while (count > leftInFile) {
+//		retval = change_size(oi, oi->oi_size + count - leftInFile);
+//		if (retval != 0)
+//			return (ssize_t) ERR_PTR(retval);
+//		if (append)
+//			leftInFile = 0;
+//		leftInFile = oi->oi_size - *f_pos;
+//	}
 
 	// Copy data block by block
 	while (amount < count && retval >= 0) {
@@ -1255,7 +1274,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count,
 			n = OSPFS_BLKSIZE - data_offset;
 		else // Reached last block to write
 			n = bytesLeft;
-		
+
 		notWritten = copy_from_user(data + data_offset, buffer, n);
 		if (notWritten != 0) {
 			retval = -EFAULT;
@@ -1411,6 +1430,8 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir,
 	newDirEntry = create_blank_direntry(dir_oi);
 	if (IS_ERR(newDirEntry))
 		return PTR_ERR(newDirEntry);
+	if (newDirEntry == NULL)
+		return -EIO;
 
 	/* Initialize new link information. */
 	memcpy(newDirEntry->od_name, dst_dentry->d_name.name, 
