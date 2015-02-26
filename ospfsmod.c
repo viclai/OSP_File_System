@@ -510,10 +510,10 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		// Get pointer to next entry and pointer to that entry's inode
 		od = ospfs_inode_data(dir_oi, (f_pos - 2) * 
 			OSPFS_DIRENTRY_SIZE);
-		if (od->od_ino == 0) {
+		/*if (od->od_ino == 0) {
 			r = 1;
 			break;
-		}
+		}*/
 		entry_oi = ospfs_inode(od->od_ino);
 
 		// Call filldir on each dir entry.
@@ -723,7 +723,8 @@ indir_index(uint32_t b)
 	else if (b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
 		return 0;
 	else
-		return b - (OSPFS_NDIRECT + OSPFS_NINDIRECT);
+		return b - (OSPFS_NDIRECT + OSPFS_NINDIRECT)
+			/ OSPFS_NINDIRECT;
 }
 
 
@@ -745,7 +746,7 @@ direct_index(uint32_t b)
 	else if (b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
 		return b - OSPFS_NDIRECT;
 	else
-		return b - (OSPFS_NDIRECT + OSPFS_NINDIRECT) 
+		return (b - OSPFS_NDIRECT)
 			% OSPFS_NINDIRECT;
 }
 
@@ -798,7 +799,9 @@ add_block(ospfs_inode_t *oi)
 	uint32_t indirect2Block;
 	uint32_t* ospfs_indirect2Block;
 	uint32_t* ospfs_indirect1Block;
-
+	
+	if (n < 0)
+		return -EIO;
 	if (n <= OSPFS_NDIRECT) {
 		directBlock = allocate_block();
 		if (directBlock == 0) {
@@ -905,7 +908,7 @@ add_block(ospfs_inode_t *oi)
 	} else // n == OSPFS_MAXFILEBLKS
 		return -ENOSPC;
 	
-	oi->oi_size = OSPFS_BLKSIZE * (n + 1); // Update file size. 
+	oi->oi_size = OSPFS_BLKSIZE/* * (n + 1)*/; // Update file size. 
 	return 0;
 }
 
@@ -1716,4 +1719,3 @@ module_exit(exit_ospfs_fs)
 MODULE_AUTHOR("Gloria Chan & Victor Lai");
 MODULE_DESCRIPTION("OSPFS");
 MODULE_LICENSE("GPL");
-
