@@ -124,6 +124,24 @@ close FOO;
       "0000400"
     ],
 
+    # Symbolic links:
+
+    # Create a symbolic link
+    [ 'ln -s hello.txt test/hlink; cat test/hlink',
+      "Hello, world!"
+    ],
+
+    # Delete a symbolic link 
+    [ 'rm test/hlink && ls test | grep hlink',
+      ""
+    ],
+
+    # Conditional symbolic link
+    [ 'echo "Not root" > test/notroot && echo "Root" > test/root && '.
+      'ln -s root?root:notroot test/amiroot && cat test/amiroot',
+      "Root"
+    ],
+
 );
 
 my($ntest) = 0;
