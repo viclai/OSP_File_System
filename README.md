@@ -1,6 +1,6 @@
 # Synopsis
 
-OSP File System is a course-related project assigned in an upper-division operating systems <a href="http://www.registrar.ucla.edu/schedule/subdet.aspx?srs=187336200&term=15W&session=" target="_blank" title="COM SCI 111">class</a> at UCLA. OSPFS is the name of the file system that is built and able to support read and write of file in a hierarchical directory structure.
+OSP File System is a course-related project assigned in an upper-division operating systems <a href="http://web.cs.ucla.edu/classes/winter15/cs111/" target="_blank" title="COM SCI 111">class</a> at UCLA. OSPFS is the name of the file system that is built and able to support read and write of file in a hierarchical directory structure.
 
 # Development
 
